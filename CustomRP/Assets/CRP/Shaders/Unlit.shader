@@ -19,6 +19,7 @@ Shader "CRP/Unlit"
 		ZWrite true		
 
 		 HLSLPROGRAM
+		#pragma target 3.5
 		#pragma multi_compile_instancing
 		#pragma shader_feature _CLIPPING
 		#pragma vertex UnlitPassVertex

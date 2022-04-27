@@ -16,6 +16,7 @@ public partial class SingleCameraRenderer
     ScriptableRenderContext context;
     Camera camera;
     CullingResults cullingResults;
+    Lighting lighting = new Lighting();
 
     //新建一块buffer给单个camerarendere使用
     const string bufferName = "Render Single Camera";
@@ -35,8 +36,10 @@ public partial class SingleCameraRenderer
         {
             return;
         }
+
         //再设置渲染初值
         Setup();
+        lighting.Setup(context, cullingResults);
         DrawVisibleGeometry(useDynamicBatching, useGPUInstancing);
         DrawUnsupportedShaders();
         DrawGizmos();
@@ -85,7 +88,8 @@ public partial class SingleCameraRenderer
         {
             enableDynamicBatching = useDynamicBatching,
             enableInstancing = useGPUInstancing
-        }; ;
+        };
+        drawingSettings.SetShaderPassName(1, litShaderTagId);
 
         var filteringSettings = new FilteringSettings(RenderQueueRange.opaque);
         //绘制场景中的物体，这里会创建一个drawloop
