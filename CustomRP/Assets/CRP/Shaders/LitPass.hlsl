@@ -25,6 +25,7 @@ struct Attributes {
 };
 struct Varyings {
 	float4 positionCS : SV_POSITION;
+	float3 positionWS : VAR_POSITION;
 	float3 normalWS : VAR_NORMAL;
 	float2 baseUV : VAR_BASE_UV;
 	UNITY_VERTEX_INPUT_INSTANCE_ID
@@ -34,8 +35,8 @@ Varyings LitPassVertex  (Attributes input) {
 	Varyings output;
 	UNITY_SETUP_INSTANCE_ID(input);//这个意思是是让宏获取当前
 	UNITY_TRANSFER_INSTANCE_ID(input, output);//将这个ID拷贝到output
-	float3 positionWS = TransformObjectToWorld(input.positionOS);//WS for WorldSpace
-	output.positionCS = TransformWorldToHClip(positionWS);//mvp变换
+	output.positionWS = TransformObjectToWorld(input.positionOS);//WS for WorldSpace
+	output.positionCS = TransformWorldToHClip(output.positionWS);//mvp变换
 
 	float4 baseST = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseMap_ST);
 	output.baseUV = input.baseUV * baseST.xy + baseST.zw;
@@ -59,11 +60,17 @@ float4 LitPassFragment (Varyings input):SV_TARGET{
 	surface.alpha = base.a;
 	surface.metallic = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Metallic);
 	surface.smoothness = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Smoothness);
+	surface.viewDirection = normalize(_WorldSpaceCameraPos - input.positionWS);
 
-	BRDF brdf = GetBRDF(surface);
+	#if defined(_PREMULTIPLY_ALPHA)
+		BRDF brdf = GetBRDF(surface, true);
+	#else
+		BRDF brdf = GetBRDF(surface);
+	#endif
+	
 	float3 color = GetLighting(surface, brdf);
 	
-	return float4(color, surface.alpha);
+	return float4(color, surface.alpha);//rgb和alpha分开算了
 }
 
 #endif

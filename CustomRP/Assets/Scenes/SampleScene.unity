@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 705507994}
-  m_IndirectSpecularColor: {r: 0.45102423, g: 0.50086516, b: 0.5742691, a: 1}
+  m_IndirectSpecularColor: {r: 0.44740242, g: 0.49734235, b: 0.5752607, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -768,13 +768,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 705507993}
-  m_LocalRotation: {x: 0.3472601, y: -0.31792355, z: -0.08410211, w: 0.87821513}
+  m_LocalRotation: {x: 0.4433703, y: -0.2691753, z: -0.035348494, w: 0.85423535}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 2
-  m_LocalEulerAnglesHint: {x: 33.812, y: -47.934, z: -26.33}
+  m_LocalEulerAnglesHint: {x: 47.6, y: -46.76, z: -26.33}
 --- !u!1 &827839945
 GameObject:
   m_ObjectHideFlags: 0
@@ -1043,13 +1043,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
-  m_LocalRotation: {x: 0.24052174, y: 0.06429968, z: -0.01597045, w: 0.96838003}
-  m_LocalPosition: {x: -1.2, y: 1.8, z: -6.89}
+  m_LocalRotation: {x: 0.23794676, y: 0.15525791, z: -0.03856224, w: 0.95801324}
+  m_LocalPosition: {x: -1.629, y: 1.557, z: -6.251}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: 27.897, y: 7.598, z: 0}
+  m_LocalEulerAnglesHint: {x: 27.897, y: 18.411, z: 0}
 --- !u!114 &963194229
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1075,7 +1075,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
-  material: {fileID: 2100000, guid: 12ad9d08e4f36ce4282a67209b03dbed, type: 2}
+  material: {fileID: 2100000, guid: 192d24027b9f8af45859a11dd57da70e, type: 2}
 --- !u!1 &1008018702
 GameObject:
   m_ObjectHideFlags: 0
@@ -1165,7 +1165,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1008018702}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.58, y: 0.1, z: -3.03}
+  m_LocalPosition: {x: -3.3, y: 0.01, z: -1.37}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}

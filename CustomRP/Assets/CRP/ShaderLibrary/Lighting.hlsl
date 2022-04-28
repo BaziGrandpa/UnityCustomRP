@@ -1,12 +1,19 @@
 ﻿#ifndef CUSTOM_LIGHTING_INCLUDED
 #define CUSTOM_LIGHTING_INCLUDED
 //处理光照计算的
+//计算这个点可以辐射多少能量！即计算了这个点总体输入的能量
 float3 IncomingLight (Surface surface, Light light) {
 	return saturate(dot(surface.normal, light.direction)) * light.color;
 }
 
+//surface包含了观察方向，以及该点的数据，高光+漫反射
+float3 DirectBRDF (Surface surface, BRDF brdf, Light light) {
+	return SpecularStrength(surface, brdf, light) * brdf.specular + brdf.diffuse;
+}
+
+//用这个像素接受到的总体能量*经过brdf计算后再有多少可以反射出来
 float3 GetLighting (Surface surface, BRDF brdf, Light light) {
-	return IncomingLight(surface, light) * brdf.diffuse;//意思是并非全部能量都反射出来的
+	return IncomingLight(surface, light) * DirectBRDF(surface, brdf, light);
 }
 
 float3 GetLighting (Surface surface, BRDF brdf) {
