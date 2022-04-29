@@ -25,24 +25,29 @@ public partial class SingleCameraRenderer
     CommandBuffer sample_Buffer = new CommandBuffer();
 
     //从RP进来的渲染流程
-    public void Render(ScriptableRenderContext context, Camera camera, bool useDynamicBatching, bool useGPUInstancing)
+    public void Render(ScriptableRenderContext context, Camera camera, bool useDynamicBatching, bool useGPUInstancing, ShadowSettings shadowSettings)
     {
         this.context = context;
         this.camera = camera;
         PrepareBuffer();
         PrepareForSceneWindow();
         //先剔除
-        if (!Cull())
+        if (!Cull(shadowSettings.maxDistance))
         {
             return;
         }
 
+        //shadowmap生成
+        buffer.BeginSample(SampleName);
+        ExecuteBuffer();
+        lighting.Setup(context, cullingResults, shadowSettings);
+        buffer.EndSample(SampleName);
         //再设置渲染初值
         Setup();
-        lighting.Setup(context, cullingResults);
         DrawVisibleGeometry(useDynamicBatching, useGPUInstancing);
         DrawUnsupportedShaders();
         DrawGizmos();
+        lighting.Cleanup();
         Submit();
     }
 
@@ -62,11 +67,12 @@ public partial class SingleCameraRenderer
     }
 
     //初步剔除工作
-    bool Cull()
+    bool Cull(float maxShadowDistance)
     {
         //out关键字可以直接定义在参数列表中
         if (camera.TryGetCullingParameters(out ScriptableCullingParameters p))
         {
+            p.shadowDistance = Mathf.Min(maxShadowDistance, camera.farClipPlane);
             cullingResults = context.Cull(ref p);//这一步是真正剔除，上面只是获取参数
             return true;
         }
