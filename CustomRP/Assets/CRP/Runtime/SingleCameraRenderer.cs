@@ -37,7 +37,7 @@ public partial class SingleCameraRenderer
             return;
         }
 
-        //shadowmap生成
+        //光照初始化，shadowmap生成
         buffer.BeginSample(SampleName);
         ExecuteBuffer();
         lighting.Setup(context, cullingResults, shadowSettings);

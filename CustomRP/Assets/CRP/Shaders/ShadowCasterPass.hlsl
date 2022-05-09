@@ -44,7 +44,8 @@ float4 ShadowCasterPassFragment (Varyings input): SV_TARGET {
 	#if defined(_CLIPPING)
 		clip(base.a - UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Cutoff));
 	#endif
-	return base;
+	return float4(1.,1.,1.,1.);
 }
+
 
 #endif
