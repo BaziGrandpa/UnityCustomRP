@@ -8,14 +8,24 @@ public class Shadows
     static int dirShadowMatricesId = Shader.PropertyToID("_DirectionalShadowMatrices"),
                 cascadeCountId = Shader.PropertyToID("_CascadeCount"),
                 cascadeCullingSpheresId = Shader.PropertyToID("_CascadeCullingSpheres"),
-                shadowDistanceId = Shader.PropertyToID("_ShadowDistance");
+                cascadeDataId = Shader.PropertyToID("_CascadeData"),
+                shadowAtlasSizeId = Shader.PropertyToID("_ShadowAtlasSize"),
+                shadowDistanceFadeId = Shader.PropertyToID("_ShadowDistanceFade");
     //前三个分量是圆心坐标，w分量是半径
-    static Vector4[] cascadeCullingSpheres = new Vector4[maxCascades];
+    static Vector4[] cascadeCullingSpheres = new Vector4[maxCascades],
+                cascadeData = new Vector4[maxCascades];
 
     //支持投射阴影的灯
     const int maxShadowedDirectionalLightCount = 4, maxCascades = 4;
     static Matrix4x4[]
         dirShadowMatrices = new Matrix4x4[maxShadowedDirectionalLightCount * maxCascades];
+
+    //PCF模式
+    static string[] directionalFilterKeywords = {
+        "_DIRECTIONAL_PCF3",
+        "_DIRECTIONAL_PCF5",
+        "_DIRECTIONAL_PCF7",
+    };
 
     //已经计算了多少盏阴影
     int ShadowedDirectionalLightCount;
@@ -36,6 +46,8 @@ public class Shadows
     struct ShadowedDirectionalLight
     {
         public int visibleLightIndex;
+        public float slopeScaleBias;
+        public float nearPlaneOffset;
     }
 
 
@@ -51,18 +63,25 @@ public class Shadows
     }
     //用于指定使用这个阴影的灯光的id
     //返回值放一个阴影强度，一个当前算到第几个阴影了
-    public Vector2 ReserveDirectionalShadows(Light light, int visibleLightIndex)
+    public Vector3 ReserveDirectionalShadows(Light light, int visibleLightIndex)
     {
         if (ShadowedDirectionalLightCount < maxShadowedDirectionalLightCount &&
             light.shadows != LightShadows.None && light.shadowStrength > 0f &&
             cullingResults.GetShadowCasterBounds(visibleLightIndex, out Bounds b))
         {
-            ShadowedDirectionalLights[ShadowedDirectionalLightCount] = new ShadowedDirectionalLight { visibleLightIndex = visibleLightIndex };
-            return new Vector2(
-                light.shadowStrength, settings.directional.cascadeCount * ShadowedDirectionalLightCount++
+            ShadowedDirectionalLights[ShadowedDirectionalLightCount] = new ShadowedDirectionalLight
+            {
+                visibleLightIndex = visibleLightIndex,
+                slopeScaleBias = light.shadowBias,
+                nearPlaneOffset = light.shadowNearPlane
+            };
+            return new Vector3(
+                light.shadowStrength,
+                settings.directional.cascadeCount * ShadowedDirectionalLightCount++,
+                light.shadowNormalBias
             );
         }
-        return Vector2.zero;
+        return Vector3.zero;
     }
 
     public void Render()
@@ -106,13 +125,24 @@ public class Shadows
         buffer.SetGlobalVectorArray(
             cascadeCullingSpheresId, cascadeCullingSpheres
         );
+        buffer.SetGlobalVectorArray(cascadeDataId, cascadeData);
         //把sm矩阵发送到gpu
         buffer.SetGlobalMatrixArray(dirShadowMatricesId, dirShadowMatrices);
 
-        buffer.SetGlobalFloat(shadowDistanceId, settings.maxDistance);
+        float f = 1f - settings.directional.cascadeFade;
+        buffer.SetGlobalVector(
+            shadowDistanceFadeId,
+            new Vector4(1f / settings.maxDistance, 1f / settings.distanceFade,
+                1f / (1f - f * f))
+        );
+        SetKeywords();
+        buffer.SetGlobalVector(
+            shadowAtlasSizeId, new Vector4(atlasSize, 1f / atlasSize)
+        );
         buffer.EndSample(bufferName);
         ExecuteBuffer();
     }
+
     //一个shadowmap可以分成多个tile，用来存不同光源的深度信息
     void RenderDirectionalShadows(int index, int split, int tileSize)
     {
@@ -128,7 +158,7 @@ public class Shadows
             //为了生成适当的阴影区域，shadowmap要能覆盖当前摄像机看到的物体，就是要找到一个合适的clipspace
             //因为方向光是无距离和坐标的
             cullingResults.ComputeDirectionalShadowMatricesAndCullingPrimitives(
-            light.visibleLightIndex, i, cascadeCount, ratios, tileSize, 0f,
+            light.visibleLightIndex, i, cascadeCount, ratios, tileSize, light.nearPlaneOffset,
             out Matrix4x4 viewMatrix, out Matrix4x4 projectionMatrix,
             out ShadowSplitData splitData
              );
@@ -136,10 +166,7 @@ public class Shadows
             shadowSettings.splitData = splitData;
             if (index == 0)
             {   //先只记录主光的cullingsphere
-                Vector4 cullingSphere = splitData.cullingSphere;
-                //半径的平方，方便shader计算，在这里算比在shader算要省性能
-                cullingSphere.w *= cullingSphere.w;
-                cascadeCullingSpheres[i] = cullingSphere;
+                SetCascadeData(i, splitData.cullingSphere, tileSize);
             }
 
             int tileIndex = tileOffset + i;//第几盏光的第几级
@@ -149,9 +176,29 @@ public class Shadows
             );
 
             buffer.SetViewProjectionMatrices(viewMatrix, projectionMatrix);
+            buffer.SetGlobalDepthBias(500000f, 0f);
+            buffer.SetGlobalDepthBias(0f, light.slopeScaleBias);
             ExecuteBuffer();
             context.DrawShadows(ref shadowSettings);
+            buffer.SetGlobalDepthBias(0f, 0f);
+            buffer.SetGlobalDepthBias(0f, 0f);
         }
+    }
+
+    void SetCascadeData(int index, Vector4 cullingSphere, float tileSize)
+    {
+        //让Normal bias equal to texel size.这个意思是一个纹素再世界空间中的大小
+        //因为w分量是半径，2*半径
+        float texelSize = 2f * cullingSphere.w / tileSize;
+        float filterSize = texelSize * ((float)settings.directional.filter + 1f);
+        cullingSphere.w -= filterSize;
+        //半径的平方，方便shader计算，在这里算比在shader算要省性能
+        cullingSphere.w *= cullingSphere.w;
+        cascadeCullingSpheres[index] = cullingSphere;
+        cascadeData[index] = new Vector4(
+            1f / cullingSphere.w,
+            filterSize * 1.4142136f
+        );
     }
 
     Vector2 SetTileViewport(int index, int split, float tileSize)
@@ -187,6 +234,22 @@ public class Shadows
         m.m22 = 0.5f * (m.m22 + m.m32);
         m.m23 = 0.5f * (m.m23 + m.m33);
         return m;
+    }
+
+    void SetKeywords()
+    {
+        int enabledIndex = (int)settings.directional.filter - 1;
+        for (int i = 0; i < directionalFilterKeywords.Length; i++)
+        {
+            if (i == enabledIndex)
+            {
+                buffer.EnableShaderKeyword(directionalFilterKeywords[i]);
+            }
+            else
+            {
+                buffer.DisableShaderKeyword(directionalFilterKeywords[i]);
+            }
+        }
     }
 
     public void Cleanup()

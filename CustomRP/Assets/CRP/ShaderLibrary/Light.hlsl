@@ -26,6 +26,7 @@ DirectionalShadowData GetDirectionalShadowData (int lightIndex , ShadowData shad
 	data.strength = _DirectionalLightShadowData[lightIndex].x * shadowData.strength;
 	//计算正确级联在smatlas中的index
 	data.tileIndex = _DirectionalLightShadowData[lightIndex].y + shadowData.cascadeIndex;
+	data.normalBias = _DirectionalLightShadowData[lightIndex].z;
 	return data;
 }
 
@@ -34,7 +35,7 @@ Light GetDirectionalLight (int index , Surface surfaceWS, ShadowData shadowData)
 	light.color = _DirectionalLightColors[index].rgb;
 	light.direction = _DirectionalLightDirections[index].xyz;
 	DirectionalShadowData dirShadowData = GetDirectionalShadowData(index , shadowData);
-	light.attenuation = GetDirectionalShadowAttenuation(dirShadowData , surfaceWS);
+	light.attenuation = GetDirectionalShadowAttenuation(dirShadowData , shadowData , surfaceWS);
 	return light;
 }
 
