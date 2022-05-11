@@ -93,7 +93,8 @@ public partial class SingleCameraRenderer
         )
         {
             enableDynamicBatching = useDynamicBatching,
-            enableInstancing = useGPUInstancing
+            enableInstancing = useGPUInstancing,
+            perObjectData = PerObjectData.Lightmaps//告诉管线，需要传递光照贴图的uv
         };
         drawingSettings.SetShaderPassName(1, litShaderTagId);
 

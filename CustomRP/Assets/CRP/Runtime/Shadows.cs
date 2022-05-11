@@ -27,6 +27,12 @@ public class Shadows
         "_DIRECTIONAL_PCF7",
     };
 
+    //级联混合模式
+    static string[] cascadeBlendKeywords = {
+        "_CASCADE_BLEND_SOFT",
+        "_CASCADE_BLEND_DITHER"
+    };
+
     //已经计算了多少盏阴影
     int ShadowedDirectionalLightCount;
     const string bufferName = "Shadows";
@@ -99,9 +105,10 @@ public class Shadows
         }
     }
 
-    //新建一个shadowmap作为rendertarget
+
     void RenderDirectionalShadows()
     {
+        //新建一个shadowmap作为rendertarget
         int atlasSize = (int)settings.directional.atlasSize;
         buffer.GetTemporaryRT(dirShadowAtlasId, atlasSize, atlasSize, 32, FilterMode.Bilinear, RenderTextureFormat.Shadowmap);
         buffer.SetRenderTarget(
@@ -135,7 +142,11 @@ public class Shadows
             new Vector4(1f / settings.maxDistance, 1f / settings.distanceFade,
                 1f / (1f - f * f))
         );
-        SetKeywords();
+        SetKeywords(directionalFilterKeywords, (int)settings.directional.filter - 1
+        );
+        SetKeywords(
+            cascadeBlendKeywords, (int)settings.directional.cascadeBlend - 1
+        );
         buffer.SetGlobalVector(
             shadowAtlasSizeId, new Vector4(atlasSize, 1f / atlasSize)
         );
@@ -152,6 +163,7 @@ public class Shadows
         int cascadeCount = settings.directional.cascadeCount;
         int tileOffset = index * cascadeCount;
         Vector3 ratios = settings.directional.CascadeRatios;
+        float cullingFactor = Mathf.Max(0f, 0.8f - settings.directional.cascadeFade);
         //绘制CSM
         for (int i = 0; i < cascadeCount; i++)
         {
@@ -163,6 +175,7 @@ public class Shadows
             out ShadowSplitData splitData
              );
 
+            splitData.shadowCascadeBlendCullingFactor = cullingFactor;
             shadowSettings.splitData = splitData;
             if (index == 0)
             {   //先只记录主光的cullingsphere
@@ -236,18 +249,18 @@ public class Shadows
         return m;
     }
 
-    void SetKeywords()
+    void SetKeywords(string[] keywords, int enabledIndex)
     {
-        int enabledIndex = (int)settings.directional.filter - 1;
-        for (int i = 0; i < directionalFilterKeywords.Length; i++)
+        //int enabledIndex = (int)settings.directional.filter - 1;
+        for (int i = 0; i < keywords.Length; i++)
         {
             if (i == enabledIndex)
             {
-                buffer.EnableShaderKeyword(directionalFilterKeywords[i]);
+                buffer.EnableShaderKeyword(keywords[i]);
             }
             else
             {
-                buffer.DisableShaderKeyword(directionalFilterKeywords[i]);
+                buffer.DisableShaderKeyword(keywords[i]);
             }
         }
     }
