@@ -19,6 +19,8 @@ float3 GetLighting (Surface surface, BRDF brdf, Light light) {
 //最多支持四盏灯
 float3 GetLighting (Surface surfaceWS, BRDF brdf, GI gi) {
 	ShadowData shadowData = GetShadowData(surfaceWS);
+	shadowData.shadowMask = gi.shadowMask;
+	//return gi.shadowMask.shadows.rgb;先不玩shadowmask了
 	float3 color = gi.diffuse;
 	for (int i = 0; i < GetDirectionalLightCount(); i++) {
 		Light light = GetDirectionalLight(i, surfaceWS, shadowData);

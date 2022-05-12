@@ -12,6 +12,8 @@ public partial class SingleCameraRenderer
     //目前支持的
     static ShaderTagId unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit");
     static ShaderTagId litShaderTagId = new ShaderTagId("CustomLit");
+    //如果要开启后处理，几何就渲染在这个id指向的buffer上
+    static int frameBufferId = Shader.PropertyToID("_CameraFrameBuffer");
 
     ScriptableRenderContext context;
     Camera camera;
@@ -24,8 +26,12 @@ public partial class SingleCameraRenderer
 
     CommandBuffer sample_Buffer = new CommandBuffer();
 
+    //后处理
+    PostFXStack postFXStack = new PostFXStack();
+
+
     //从RP进来的渲染流程
-    public void Render(ScriptableRenderContext context, Camera camera, bool useDynamicBatching, bool useGPUInstancing, ShadowSettings shadowSettings)
+    public void Render(ScriptableRenderContext context, Camera camera, bool useDynamicBatching, bool useGPUInstancing, ShadowSettings shadowSettings, PostFXSettings postFXSettings)
     {
         this.context = context;
         this.camera = camera;
@@ -37,17 +43,25 @@ public partial class SingleCameraRenderer
             return;
         }
 
-        //光照初始化，shadowmap生成
+
         buffer.BeginSample(SampleName);
         ExecuteBuffer();
+        //光照初始化，shadowmap生成
         lighting.Setup(context, cullingResults, shadowSettings);
+        //后处理
+        postFXStack.Setup(context, camera, postFXSettings);
         buffer.EndSample(SampleName);
         //再设置渲染初值
         Setup();
         DrawVisibleGeometry(useDynamicBatching, useGPUInstancing);
         DrawUnsupportedShaders();
-        DrawGizmos();
-        lighting.Cleanup();
+        DrawGizmosBeforeFX();
+        if (postFXStack.IsActive)
+        {
+            postFXStack.Render(frameBufferId);
+        }
+        DrawGizmosAfterFX();
+        Cleanup();
         Submit();
     }
 
@@ -57,6 +71,23 @@ public partial class SingleCameraRenderer
     {
         context.SetupCameraProperties(camera);
         CameraClearFlags flags = camera.clearFlags;//clear flag决定背景渲染1 to 4 they are Skybox, Color, Depth, and Nothing
+        //如果要后处理，那么几何就不直接渲染在framebuffer上，而是开辟一个中介
+        if (postFXStack.IsActive)
+        {
+            buffer.GetTemporaryRT(
+                frameBufferId, camera.pixelWidth, camera.pixelHeight,
+                32, FilterMode.Bilinear, RenderTextureFormat.Default
+            );
+            buffer.SetRenderTarget(
+                frameBufferId,
+                RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store
+            );
+            if (flags > CameraClearFlags.Color)
+            {
+                flags = CameraClearFlags.Color;
+            }
+        }
+
         bool clearDepth = flags <= CameraClearFlags.Depth;
         bool clearColor = flags == CameraClearFlags.Color;
         buffer.ClearRenderTarget(clearDepth, clearColor, clearColor ?
@@ -94,7 +125,8 @@ public partial class SingleCameraRenderer
         {
             enableDynamicBatching = useDynamicBatching,
             enableInstancing = useGPUInstancing,
-            perObjectData = PerObjectData.Lightmaps//告诉管线，需要传递光照贴图的uv
+            perObjectData = PerObjectData.Lightmaps | PerObjectData.LightProbe | PerObjectData.ShadowMask
+            //告诉管线，需要传递光照贴图的uv
         };
         drawingSettings.SetShaderPassName(1, litShaderTagId);
 
@@ -148,6 +180,15 @@ public partial class SingleCameraRenderer
     public CommandBuffer GetSampleBuffer()
     {
         return this.sample_Buffer;
+    }
+
+    void Cleanup()
+    {
+        lighting.Cleanup();
+        if (postFXStack.IsActive)
+        {
+            buffer.ReleaseTemporaryRT(frameBufferId);
+        }
     }
 }
 public class FrameDebuggerSampler : IDisposable

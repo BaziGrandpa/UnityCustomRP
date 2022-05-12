@@ -10,6 +10,13 @@ CBUFFER_START(UnityPerDraw)
 	real4 unity_WorldTransformParams;
 	float4 unity_LightmapST;
 	float4 unity_DynamicLightmapST;
+	float4 unity_SHAr;//probe«Ú–≥œ‡πÿ
+	float4 unity_SHAg;
+	float4 unity_SHAb;
+	float4 unity_SHBr;
+	float4 unity_SHBg;
+	float4 unity_SHBb;
+	float4 unity_SHC;
 CBUFFER_END
 
 float4x4 unity_MatrixVP;

@@ -23,6 +23,7 @@
 #endif
 
 TEXTURE2D(_BaseMap);
+TEXTURE2D(_EmissionMap);
 SAMPLER(sampler_BaseMap);
 
 UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
@@ -31,9 +32,14 @@ UNITY_INSTANCING_BUFFER_START(UnityPerMaterial)
 	UNITY_DEFINE_INSTANCED_PROP(float4, _BaseColor)
 	UNITY_DEFINE_INSTANCED_PROP(float, _Metallic)
 	UNITY_DEFINE_INSTANCED_PROP(float, _Smoothness)
+	UNITY_DEFINE_INSTANCED_PROP(float4, _EmissionColor)
 UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
-
+float3 GetEmission (float2 baseUV) {
+	float4 map = SAMPLE_TEXTURE2D(_EmissionMap, sampler_BaseMap, baseUV);
+	float4 color = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _EmissionColor);
+	return map.rgb * color.rgb;
+}
 
 struct Attributes {
 	float3 positionOS : POSITION;
@@ -92,9 +98,9 @@ float4 LitPassFragment (Varyings input):SV_TARGET{
 		BRDF brdf = GetBRDF(surface);
 	#endif
 	
-	GI gi = GetGI(GI_FRAGMENT_DATA(input));
+	GI gi = GetGI(GI_FRAGMENT_DATA(input), surface);
 	float3 color = GetLighting(surface, brdf, gi);
-	
+	color += GetEmission(input.baseUV);
 	return float4(color, surface.alpha);//rgb和alpha分开算了
 }
 

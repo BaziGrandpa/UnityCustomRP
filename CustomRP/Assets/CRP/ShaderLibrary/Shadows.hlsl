@@ -37,10 +37,16 @@ CBUFFER_END
 		float normalBias;
     };
 
+	struct ShadowMask {
+		bool distance;
+		float4 shadows;
+	};
+
 	struct ShadowData {
 		float cascadeBlend;//处理不同级联的混合
 		int cascadeIndex;
 		float strength;//用于处理超出级联范围的cascadeIndex
+		ShadowMask shadowMask;
 	};
 
 float FadedShadowStrength (float distance, float scale, float fade) {
@@ -84,6 +90,10 @@ float FadedShadowStrength (float distance, float scale, float fade) {
 		data.cascadeBlend = 1.0;
 		#endif
 		data.cascadeIndex = i;
+
+		data.shadowMask.distance = false;
+		data.shadowMask.shadows = 1.0;
+
 		return data;
 	}
 

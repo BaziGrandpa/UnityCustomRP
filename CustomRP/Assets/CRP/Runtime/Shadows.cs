@@ -33,6 +33,13 @@ public class Shadows
         "_CASCADE_BLEND_DITHER"
     };
 
+    //烘培阴影
+    static string[] shadowMaskKeywords = {
+        "_SHADOW_MASK_DISTANCE"
+    };
+
+    bool useShadowMask;
+
     //已经计算了多少盏阴影
     int ShadowedDirectionalLightCount;
     const string bufferName = "Shadows";
@@ -65,6 +72,7 @@ public class Shadows
         this.context = context;
         this.cullingResults = cullingResults;
         this.settings = settings;
+        this.useShadowMask = false;
         ShadowedDirectionalLightCount = 0;
     }
     //用于指定使用这个阴影的灯光的id
@@ -75,6 +83,15 @@ public class Shadows
             light.shadows != LightShadows.None && light.shadowStrength > 0f &&
             cullingResults.GetShadowCasterBounds(visibleLightIndex, out Bounds b))
         {
+            //是否使用烘焙阴影
+            LightBakingOutput lightBaking = light.bakingOutput;
+            if (
+                lightBaking.lightmapBakeType == LightmapBakeType.Mixed &&
+                lightBaking.mixedLightingMode == MixedLightingMode.Shadowmask
+            )
+            {
+                useShadowMask = true;
+            }
             ShadowedDirectionalLights[ShadowedDirectionalLightCount] = new ShadowedDirectionalLight
             {
                 visibleLightIndex = visibleLightIndex,
@@ -103,6 +120,11 @@ public class Shadows
                 32, FilterMode.Bilinear, RenderTextureFormat.Shadowmap
             );
         }
+
+        buffer.BeginSample(bufferName);
+        SetKeywords(shadowMaskKeywords, useShadowMask ? 0 : -1);
+        buffer.EndSample(bufferName);
+        ExecuteBuffer();
     }
 
 

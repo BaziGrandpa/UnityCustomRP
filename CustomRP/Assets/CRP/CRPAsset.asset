@@ -16,8 +16,8 @@ MonoBehaviour:
   useGPUInstancing: 1
   useSRPBatcher: 0
   shadowSetting:
-    maxDistance: 12
-    distanceFade: 0.001
+    maxDistance: 11.3
+    distanceFade: 0.148
     directional:
       atlasSize: 512
       filter: 3
@@ -27,3 +27,4 @@ MonoBehaviour:
       cascadeRatio3: 0.5
       cascadeFade: 0.1
       cascadeBlend: 1
+  postFXSettings: {fileID: 11400000, guid: ad58384f9348e094aba6066c511ad83c, type: 2}

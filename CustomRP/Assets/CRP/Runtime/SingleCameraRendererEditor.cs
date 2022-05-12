@@ -9,7 +9,8 @@ partial class SingleCameraRenderer
 {
     //partial声明方式意味着，如果这个函数没有提供实现，编译时回将其移除
     partial void DrawUnsupportedShaders();
-    partial void DrawGizmos();
+    partial void DrawGizmosBeforeFX();
+    partial void DrawGizmosAfterFX();
     partial void PrepareForSceneWindow();
     partial void PrepareBuffer();
 
@@ -62,14 +63,23 @@ partial class SingleCameraRenderer
             cullingResults, ref drawingSettings, ref filteringSettings
         );
     }
-    partial void DrawGizmos()
+   
+    partial void DrawGizmosBeforeFX()
     {
         if (Handles.ShouldRenderGizmos())
         {
             context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
+        }
+    }
+
+    partial void DrawGizmosAfterFX()
+    {
+        if (Handles.ShouldRenderGizmos())
+        {
             context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
         }
     }
+    
 #else
 	const string SampleName = bufferName;
 #endif
