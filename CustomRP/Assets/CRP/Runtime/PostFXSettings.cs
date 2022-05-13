@@ -4,6 +4,11 @@
 public class PostFXSettings : ScriptableObject
 {
     [SerializeField]
+    bool needPostFx = default;
+
+    public bool NeedPostFx => needPostFx;
+
+    [SerializeField]
     Shader shader = default;
 
     [System.NonSerialized]

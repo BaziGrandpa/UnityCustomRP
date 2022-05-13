@@ -2,12 +2,6 @@
 #define CUSTOM_UNLIT_PASS_INCLUDED
 #include "../ShaderLibrary/Common.hlsl"
 
-// // To make the Unity shader SRP Batcher compatible, declare all
-// // properties related to a Material in a a single CBUFFER block with 
-//// the name UnityPerMaterial.
-//CBUFFER_START(UnityPerMaterial)           
-//	float4 _BaseColor;            
-//CBUFFER_END
 
 TEXTURE2D(_BaseMap);
 SAMPLER(sampler_BaseMap);
@@ -21,6 +15,7 @@ UNITY_INSTANCING_BUFFER_END(UnityPerMaterial)
 
 struct Attributes {
 	float3 positionOS : POSITION;
+	float4 color : COLOR;
 	float2 baseUV : TEXCOORD0;
 	UNITY_VERTEX_INPUT_INSTANCE_ID
 };
@@ -43,18 +38,24 @@ Varyings UnlitPassVertex (Attributes input) {
 	float4 baseST = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseMap_ST);
 	output.baseUV = input.baseUV * baseST.xy + baseST.zw;
 
+	#if defined(_VERTEX_COLORS)
+		output.color = input.color;		
+	#endif
 	return output;
 }
 
 float4 UnlitPassFragment (Varyings input):SV_TARGET{
 	UNITY_SETUP_INSTANCE_ID(input);
-	float4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, input.baseUV);
+	float2 fixed_uv = input.baseUV/4.f;
+	float4 baseMap = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, fixed_uv);
 	float4 baseColor = UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _BaseColor);
 	float4 base =  baseMap * baseColor;//这个不是点乘，而是各分量相乘，效果是贴图叠加一层颜色
 	#if defined(_CLIPPING)
 		clip(base.a - UNITY_ACCESS_INSTANCED_PROP(UnityPerMaterial, _Cutoff));//alpha小于阈值的直接丢弃
 	#endif
-
+	#if defined(_VERTEX_COLORS)
+		base = base * input.color;
+	#endif
 	return base;
 }
 

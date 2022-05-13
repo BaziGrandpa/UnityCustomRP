@@ -22,7 +22,13 @@ public partial class PostFXStack
     Camera camera;
     PostFXSettings settings;
 
-    public bool IsActive => settings != null;
+    public bool IsActive
+    {
+        get
+        {
+            return settings != null && settings.NeedPostFx;
+        }
+    }
 
     int fxSourceId = Shader.PropertyToID("_PostFXSource"),
         fxSource2Id = Shader.PropertyToID("_PostFXSource2");

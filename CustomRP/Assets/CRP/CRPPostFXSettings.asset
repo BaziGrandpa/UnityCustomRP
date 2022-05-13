@@ -13,3 +13,6 @@ MonoBehaviour:
   m_Name: CRPPostFXSettings
   m_EditorClassIdentifier: 
   shader: {fileID: 4800000, guid: 5c17bec035f787147a8c39ee68b52885, type: 3}
+  bloom:
+    maxIterations: 3
+    downscaleLimit: 0
