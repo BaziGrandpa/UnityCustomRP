@@ -4,7 +4,6 @@
 //采样原来渲染的图片
 TEXTURE2D(_PostFXSource);
 TEXTURE2D(_PostFXSource2);
-SAMPLER(sampler_linear_clamp);
 
 //采样后处理之前渲染好的图片
 float4 GetSource(float2 screenUV) {

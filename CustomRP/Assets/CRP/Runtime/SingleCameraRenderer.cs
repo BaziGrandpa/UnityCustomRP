@@ -13,7 +13,19 @@ public partial class SingleCameraRenderer
     static ShaderTagId unlitShaderTagId = new ShaderTagId("SRPDefaultUnlit");
     static ShaderTagId litShaderTagId = new ShaderTagId("CustomLit");
     //如果要开启后处理，几何就渲染在这个id指向的buffer上
-    static int frameBufferId = Shader.PropertyToID("_CameraFrameBuffer");
+    //static int frameBufferId = Shader.PropertyToID("_CameraFrameBuffer");
+    static int
+        colorAttachmentId = Shader.PropertyToID("_CameraColorAttachment"),
+        depthAttachmentId = Shader.PropertyToID("_CameraDepthAttachment"),
+        colorTextureId = Shader.PropertyToID("_CameraColorTexture"),
+        depthTextureId = Shader.PropertyToID("_CameraDepthTexture"),
+        sourceTextureId = Shader.PropertyToID("_SourceTexture");
+
+    //是否会用到深度图，是否要用中介buffer
+    //整个流程是这样的如果开启后处理
+    //  若开启了后处理，则由后处理的pass将最终图像写入framebuffer
+    //  若没开启，则由camerarenderpass写入
+    bool useColorTexture, useDepthTexture, useIntermediateBuffer, useHDR;
 
     ScriptableRenderContext context;
     Camera camera;
@@ -29,9 +41,28 @@ public partial class SingleCameraRenderer
     //后处理
     PostFXStack postFXStack = new PostFXStack();
 
+    Material material;
+
+    //用于处理不开启深度复制的采样source问题
+    Texture2D missingTexture;
+
+    static bool copyTextureSupported = SystemInfo.copyTextureSupport > CopyTextureSupport.None;
+
+    public SingleCameraRenderer(Shader shader)
+    {
+        material = CoreUtils.CreateEngineMaterial(shader);
+        missingTexture = new Texture2D(1, 1)
+        {
+            hideFlags = HideFlags.HideAndDontSave,
+            name = "Missing"
+        };
+        missingTexture.SetPixel(0, 0, Color.white * 0.5f);
+        missingTexture.Apply(true, true);
+    }
+
 
     //从RP进来的渲染流程
-    public void Render(ScriptableRenderContext context, Camera camera, bool useDynamicBatching, bool useGPUInstancing, ShadowSettings shadowSettings, PostFXSettings postFXSettings)
+    public void Render(ScriptableRenderContext context, Camera camera, CameraBufferSettings bufferSettings, bool useDynamicBatching, bool useGPUInstancing, ShadowSettings shadowSettings, PostFXSettings postFXSettings)
     {
         this.context = context;
         this.camera = camera;
@@ -43,6 +74,17 @@ public partial class SingleCameraRenderer
             return;
         }
 
+        if (camera.cameraType == CameraType.Reflection)
+        {
+            useColorTexture = bufferSettings.copyColorReflection;
+            useDepthTexture = bufferSettings.copyDepthReflection;
+        }
+        else
+        {
+            useColorTexture = bufferSettings.copyColor;
+            useDepthTexture = bufferSettings.copyDepth;
+        }
+        useHDR = bufferSettings.allowHDR && camera.allowHDR;
 
         buffer.BeginSample(SampleName);
         ExecuteBuffer();
@@ -51,14 +93,21 @@ public partial class SingleCameraRenderer
         //后处理
         postFXStack.Setup(context, camera, postFXSettings);
         buffer.EndSample(SampleName);
-        //再设置渲染初值
+        //主要工作在于根据需求设置rendertarget
         Setup();
         DrawVisibleGeometry(useDynamicBatching, useGPUInstancing);
         DrawUnsupportedShaders();
         DrawGizmosBeforeFX();
         if (postFXStack.IsActive)
         {
-            postFXStack.Render(frameBufferId);
+            //用后处理shader绘制到CameraTarget
+            postFXStack.Render(colorAttachmentId);
+        }
+        else if (useIntermediateBuffer)
+        {
+            //用普通的复制shader
+            Draw(colorAttachmentId, BuiltinRenderTextureType.CameraTarget, false);
+            ExecuteBuffer();
         }
         DrawGizmosAfterFX();
         Cleanup();
@@ -72,20 +121,30 @@ public partial class SingleCameraRenderer
         context.SetupCameraProperties(camera);
         CameraClearFlags flags = camera.clearFlags;//clear flag决定背景渲染1 to 4 they are Skybox, Color, Depth, and Nothing
         //如果要后处理，那么几何就不直接渲染在framebuffer上，而是开辟一个中介
-        if (postFXStack.IsActive)
+        //主要还是framebuffer不支持直接采样，所以要先渲染到中介上，去采样中介
+        bool useFrameBuffer = useColorTexture || useDepthTexture;
+        useIntermediateBuffer = postFXStack.IsActive || useFrameBuffer;
+        if (useIntermediateBuffer)
         {
-            buffer.GetTemporaryRT(
-                frameBufferId, camera.pixelWidth, camera.pixelHeight,
-                32, FilterMode.Bilinear, RenderTextureFormat.Default
-            );
-            buffer.SetRenderTarget(
-                frameBufferId,
-                RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store
-            );
             if (flags > CameraClearFlags.Color)
             {
                 flags = CameraClearFlags.Color;
             }
+            buffer.GetTemporaryRT(
+                colorAttachmentId, camera.pixelWidth, camera.pixelHeight,
+                0, FilterMode.Bilinear, RenderTextureFormat.Default
+            );
+            buffer.GetTemporaryRT(
+                depthAttachmentId, camera.pixelWidth, camera.pixelHeight,
+                32, FilterMode.Point, RenderTextureFormat.Depth
+            );
+            //分别指定colorbuffer and zbuffer
+            buffer.SetRenderTarget(
+                colorAttachmentId,
+                RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store,
+                depthAttachmentId,
+                RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store
+            );
         }
 
         bool clearDepth = flags <= CameraClearFlags.Depth;
@@ -93,8 +152,10 @@ public partial class SingleCameraRenderer
         buffer.ClearRenderTarget(clearDepth, clearColor, clearColor ?
                 camera.backgroundColor.linear : Color.clear);
         buffer.BeginSample(SampleName);
+        //先设置默认图，没有开启depthcopy，就会采样missingtexture
+        buffer.SetGlobalTexture(colorTextureId, missingTexture);
+        buffer.SetGlobalTexture(depthTextureId, missingTexture);
         ExecuteBuffer();
-
     }
 
     //初步剔除工作
@@ -142,6 +203,11 @@ public partial class SingleCameraRenderer
             context.DrawSkybox(camera);
         }
 
+        //在透明物体绘制前复制
+        if (useColorTexture || useDepthTexture)
+        {
+            CopyAttachments();
+        }
 
         //透明物体绘制
         using (new FrameDebuggerSampler(this, "Draw Trans and UI"))
@@ -152,6 +218,42 @@ public partial class SingleCameraRenderer
             context.DrawRenderers(cullingResults, ref drawingSettings, ref filteringSettings);
         }
 
+    }
+
+    //按需复制，以供shader采样
+    void CopyAttachments()
+    {
+        if (useColorTexture)
+        {
+            buffer.GetTemporaryRT(
+                colorTextureId, camera.pixelWidth, camera.pixelHeight,
+                0, FilterMode.Bilinear, RenderTextureFormat.Default
+            );
+            buffer.CopyTexture(colorAttachmentId, colorTextureId);
+        }
+        if (useDepthTexture)
+        {
+            buffer.GetTemporaryRT(
+                depthTextureId, camera.pixelWidth, camera.pixelHeight,
+                32, FilterMode.Point, RenderTextureFormat.Depth
+            );
+            if (copyTextureSupported)
+            {
+                buffer.CopyTexture(depthAttachmentId, depthTextureId);
+            }
+            else
+            {
+                Draw(depthAttachmentId, depthTextureId, true);
+                buffer.SetRenderTarget(
+                    colorAttachmentId,
+                    RenderBufferLoadAction.Load, RenderBufferStoreAction.Store,
+                    depthAttachmentId,
+                    RenderBufferLoadAction.Load, RenderBufferStoreAction.Store
+                );
+            }
+
+        }
+        ExecuteBuffer();
     }
 
     //context真正执行
@@ -182,13 +284,43 @@ public partial class SingleCameraRenderer
         return this.sample_Buffer;
     }
 
+    //这一步将from绘制到to上，目前就final调用下，从中介画到framebuffer
+    void Draw(RenderTargetIdentifier from, RenderTargetIdentifier to, bool isDepth = false)
+    {
+        buffer.SetGlobalTexture(sourceTextureId, from);
+        buffer.SetRenderTarget(
+            to, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store
+        );
+        buffer.DrawProcedural(
+            Matrix4x4.identity, material, isDepth ? 1 : 0, MeshTopology.Triangles, 3
+        );
+    }
+
     void Cleanup()
     {
         lighting.Cleanup();
         if (postFXStack.IsActive)
         {
-            buffer.ReleaseTemporaryRT(frameBufferId);
+            if (useIntermediateBuffer)
+            {
+                buffer.ReleaseTemporaryRT(colorAttachmentId);
+                buffer.ReleaseTemporaryRT(depthAttachmentId);
+                if (useDepthTexture)
+                {
+                    buffer.ReleaseTemporaryRT(depthTextureId);
+                }
+                if (useColorTexture)
+                {
+                    buffer.ReleaseTemporaryRT(colorTextureId);
+                }
+            }
         }
+    }
+
+    public void Dispose()
+    {
+        CoreUtils.Destroy(material);
+        CoreUtils.Destroy(missingTexture);
     }
 }
 public class FrameDebuggerSampler : IDisposable

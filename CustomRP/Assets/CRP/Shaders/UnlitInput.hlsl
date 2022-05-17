@@ -82,16 +82,16 @@ float4 GetBase (InputConfig c) {
 	return baseMap * baseColor * c.color;
 }
 
-float2 GetDistortion (InputConfig c) {
-	float4 rawMap = SAMPLE_TEXTURE2D(_DistortionMap, sampler_BaseMap, c.baseUV);
-	if (c.flipbookBlending) {
-		rawMap = lerp(
-			rawMap, SAMPLE_TEXTURE2D(_DistortionMap, sampler_BaseMap, c.flipbookUVB.xy),
-			c.flipbookUVB.z
-		);
-	}
-	return DecodeNormal(rawMap, INPUT_PROP(_DistortionStrength)).xy;
-}
+//float2 GetDistortion (InputConfig c) {
+//	float4 rawMap = SAMPLE_TEXTURE2D(_DistortionMap, sampler_BaseMap, c.baseUV);
+//	if (c.flipbookBlending) {
+//		rawMap = lerp(
+//			rawMap, SAMPLE_TEXTURE2D(_DistortionMap, sampler_BaseMap, c.flipbookUVB.xy),
+//			c.flipbookUVB.z
+//		);
+//	}
+//	return DecodeNormal(rawMap, INPUT_PROP(_DistortionStrength)).xy;
+//}
 
 float GetDistortionBlend (InputConfig c) {
 	return INPUT_PROP(_DistortionBlend);

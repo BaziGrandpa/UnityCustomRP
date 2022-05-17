@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7305b4702c7e9974097c933bfc4ee9be, type: 3}
   m_Name: CRPPostFXSettings
   m_EditorClassIdentifier: 
+  needPostFx: 0
   shader: {fileID: 4800000, guid: 5c17bec035f787147a8c39ee68b52885, type: 3}
   bloom:
     maxIterations: 3

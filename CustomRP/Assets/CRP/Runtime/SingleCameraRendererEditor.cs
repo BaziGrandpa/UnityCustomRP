@@ -13,6 +13,7 @@ partial class SingleCameraRenderer
     partial void DrawGizmosAfterFX();
     partial void PrepareForSceneWindow();
     partial void PrepareBuffer();
+    partial void DisposeForEditor();
 
 #if UNITY_EDITOR
     //其余的shader同一绘制一个普通的颜色
@@ -63,11 +64,16 @@ partial class SingleCameraRenderer
             cullingResults, ref drawingSettings, ref filteringSettings
         );
     }
-   
+
     partial void DrawGizmosBeforeFX()
     {
         if (Handles.ShouldRenderGizmos())
         {
+            if (useIntermediateBuffer)
+            {
+                Draw(depthAttachmentId, BuiltinRenderTextureType.CameraTarget, true);
+                ExecuteBuffer();
+            }
             context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
         }
     }
@@ -79,7 +85,9 @@ partial class SingleCameraRenderer
             context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
         }
     }
-    
+
+
+
 #else
 	const string SampleName = bufferName;
 #endif
